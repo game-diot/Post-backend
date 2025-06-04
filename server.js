@@ -16,7 +16,7 @@ const app = express();
 app.use(
   cors({
     credentials: true,
-    origin: "https://post-frontend-eight.vercel.app/", // 确保这里是你的前端地址
+    origin: "https://post-frontend-eight.vercel.app", // 确保这里是你的前端地址
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -42,6 +42,5 @@ app.use("/", postRouter);
 //服务器相关内容
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log(`Server started on http://localhost:${PORT}`);
   console.log(`Frontend should be running on http://localhost:5173`);
 });
