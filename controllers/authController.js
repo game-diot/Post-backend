@@ -125,8 +125,8 @@ const logout = (req, res) => {
     .cookie("token", "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      expires: new Date(0), // 设置过期时间为过去的时间
+      sameSite: "None",
+      expires: 3600000, // 设置过期时间为过去的时间
     })
     .json({ message: "Logout successful" });
 };

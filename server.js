@@ -4,7 +4,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const path = require("path");
 const fs = require("fs");
-
+require("dotenv").config();
 //导入自定义模块
 const connectDB = require("./config/db");
 const authRouter = require("./routes/authRouter"); // 认证相关路由

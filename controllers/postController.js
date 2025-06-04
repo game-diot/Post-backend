@@ -124,7 +124,7 @@ const getAllPosts = async (req, res) => {
     const postsWithImageUrls = posts.map((post) => {
       const postObject = post.toObject();
       if (postObject.imageUrl) {
-        postObject.imageUrl = `http://localhost:4000/uploads/${postObject.imageUrl}`;
+        postObject.imageUrl = `https://post-backend-9ycs.onrender.com/uploads/${postObject.imageUrl}`;
       }
       return postObject;
     });
@@ -169,7 +169,7 @@ const getPostById = async (req, res) => {
         `[DEBUG - getPostById] Original imageUrl before拼接:`,
         postObject.imageUrl
       );
-      postObject.imageUrl = `http://localhost:4000/uploads/${postObject.imageUrl}`;
+      postObject.imageUrl = `https://post-backend-9ycs.onrender.com/uploads/${postObject.imageUrl}`;
       console.log(
         `[DEBUG - getPostById] Final imageUrl for response:`,
         postObject.imageUrl
