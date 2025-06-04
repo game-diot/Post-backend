@@ -84,7 +84,8 @@ const login = async (req, res) => {
     res.cookie("token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+
+      sameSite: "None",
       maxAge: 3600000,
     });
 
@@ -126,7 +127,8 @@ const logout = (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "None",
-      expires: 3600000, // 设置过期时间为过去的时间
+
+      maxAge: 0,
     })
     .json({ message: "Logout successful" });
 };
