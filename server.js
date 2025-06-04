@@ -16,7 +16,7 @@ const app = express();
 app.use(
   cors({
     credentials: true,
-    origin: "http://localhost:5173", // 确保这里是你的前端地址
+    origin: "https://post-frontend-eight.vercel.app/", // 确保这里是你的前端地址
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
