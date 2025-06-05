@@ -38,7 +38,10 @@ connectDB();
 // 路由挂载
 app.use("/", authRouter);
 app.use("/", postRouter);
-
+//添加ping保证后端服务持续启动避免冷启动
+app.get("/ping", (req, res) => {
+  res.status(200).send("pong");
+});
 //服务器相关内容
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
