@@ -2,18 +2,16 @@
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const path = require("path");
-const fs = require("fs");
 require("dotenv").config();
 //导入自定义模块
 const connectDB = require("./config/db");
 const authRouter = require("./routes/authRouter"); // 认证相关路由
 const postRouter = require("./routes/postRouter"); // 文章相关路由
 const app = express();
-// ✅ 导入 Cloudinary SDK
+// 导入 Cloudinary SDK
 const cloudinary = require("cloudinary").v2;
 
-// ✅ 初始化 Cloudinary 配置
+// 初始化 Cloudinary 配置
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,

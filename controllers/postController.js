@@ -1,26 +1,32 @@
-//控制器文件，用于处理与文章相关的请求
+// backend/controllers/postController.js
 const Post = require("../models/Post");
-const User = require("../models/User");
-const cloudinary = require("cloudinary").v2;
-//定义创建文章的处理函数
+const cloudinary = require("cloudinary").v2; // 确保导入 Cloudinary
+
+// 定义创建文章的处理函数
 const createPost = async (req, res) => {
   try {
-    // 从请求体中获取文章的标题、摘要和内容
     const { title, summary, content } = req.body;
 
-    // 逻辑判断，如果标题、摘要或内容为空，返回错误
     if (!title || !summary || !content) {
-      // 返回错误信息
       return res
         .status(400)
-        .json({ error: "All fields (title, summary, content) are required" });
+        .json({ error: "所有字段 (标题、摘要、内容) 都是必填项" });
     }
 
-    // 逻辑判断，如果没有上传文件，返回错误
     if (!req.file) {
-      return res.status(400).json({ error: "Cover image is required" });
+      return res.status(400).json({ error: "封面图片是必填项" });
     }
-    // 创建新的文章文档模板，标题、摘要、内容、图片URL和作者
+
+    // 将文件从内存 (req.file.buffer) 上传到 Cloudinary
+    // 这是 `result` 变量的来源，它包含了上传后的图片信息和 URL
+    const result = await cloudinary.uploader.upload(
+      `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
+      {
+        folder: "blog-posts", // 在 Cloudinary 中创建名为 'blog-posts' 的文件夹
+        resource_type: "auto", // 自动检测上传文件的类型
+      }
+    );
+
     const postDoc = await Post.create({
       title,
       summary,
@@ -28,80 +34,97 @@ const createPost = async (req, res) => {
       imageUrl: result.secure_url,
       author: req.user.id,
     });
-    // 响应成功
+
     res.status(201).json(postDoc);
   } catch (error) {
-    console.error("Error creating post:", error);
-
-    res
-      .status(500)
-      .json({ error: "Error creating post", details: error.message });
+    console.error("创建文章出错:", error);
+    res.status(500).json({ error: "创建文章失败", details: error.message });
   }
 };
 
-//定义更新文章的处理函数
+// 定义更新文章的处理函数
 const updatePost = async (req, res) => {
   try {
-    // 从请求体中获取文章的标题、摘要和内容
     const { id } = req.params;
     const { title, summary, content } = req.body;
-    let newImageUrl = null;
-    // 打印调试信息
-    console.log(`[DEBUG - updatePost] Attempting to update post ID: ${id}`);
-    console.log(`[DEBUG - updatePost] Request Body:`, req.body);
+    let newImageUrl = null; // 用于存储新的或旧的图片 URL
 
-    //从数据库中获取的文章文档，进行逻辑判断，如果文章不存在或用户不是作者，返回错误
+    console.log(`[DEBUG - updatePost] 尝试更新文章 ID: ${id}`);
+    console.log(`[DEBUG - updatePost] 请求体:`, req.body);
+
     const postDoc = await Post.findById(id);
     if (!postDoc) {
-      console.log(`[DEBUG - updatePost] Post not found for ID: ${id}`);
-      return res.status(404).json({ error: "Post not found" });
+      console.log(`[DEBUG - updatePost] 未找到文章，ID: ${id}`);
+      return res.status(404).json({ error: "文章未找到" });
     }
-    // 逻辑判断，如果用户不是作者，返回错误
-    const isAuthor =
-      JSON.stringify(postDoc.author) === JSON.stringify(req.user.id);
+
+    const isAuthor = String(postDoc.author) === String(req.user.id);
     if (!isAuthor) {
       console.log(
-        `[DEBUG - updatePost] User ${req.user.username} is not author of post ID: ${id}`
+        `[DEBUG - updatePost] 用户 ${req.user.username} 无权更新文章 ID: ${id}`
       );
-      return res
-        .status(403)
-        .json({ error: "You are not authorized to update this post" });
+      return res.status(403).json({ error: "您无权更新此文章" });
     }
-    // 逻辑判断，如果有新的文件上传，更新文章的图片URL
+
+    // 逻辑判断，如果有新的文件上传
     if (req.file) {
-      newImageUrl = req.file.filename;
-      // 删除旧的图片文件
-      if (
-        postDoc.imageUrl &&
-        fs.existsSync(path.join(uploadsDir, postDoc.imageUrl))
-      ) {
-        fs.unlinkSync(path.join(uploadsDir, postDoc.imageUrl));
+      // 将新文件上传到 Cloudinary
+      const result = await cloudinary.uploader.upload(
+        `data:${req.file.mimetype};base64,${req.file.buffer.toString(
+          "base64"
+        )}`,
+        {
+          folder: "blog-posts", // 确保这里使用的文件夹名称与创建时一致
+          resource_type: "auto",
+        }
+      );
+      newImageUrl = result.secure_url; // 更新为 Cloudinary 返回的新 URL
+
+      // 删除 Cloudinary 上的旧图片 (推荐：清理存储空间)
+      if (postDoc.imageUrl && postDoc.imageUrl.includes("res.cloudinary.com")) {
+        const urlParts = postDoc.imageUrl.split("/");
+        // 确保提取的是文件名部分，然后去除扩展名，再与文件夹名组合
+        const filenameWithExtension = urlParts[urlParts.length - 1];
+        const publicIdWithoutFolder = filenameWithExtension.split(".")[0];
+        const publicIdToDelete = `blog-posts/${publicIdWithoutFolder}`;
+
+        try {
+          await cloudinary.uploader.destroy(publicIdToDelete);
+          console.log(
+            `Cloudinary: 成功删除旧图片，Public ID: ${publicIdToDelete}`
+          );
+        } catch (deleteError) {
+          console.warn(
+            `Cloudinary: 删除旧图片 ${publicIdToDelete} 失败:`,
+            deleteError.message
+          );
+        }
       }
     } else {
       // 如果没有新的文件上传，保持旧的图片URL
       newImageUrl = postDoc.imageUrl;
     }
-    // 更新文章文档结构
+
+    // 更新文章文档
     await Post.findByIdAndUpdate(
       id,
       {
         title,
         summary,
         content,
-        imageUrl: newImageUrl,
+        imageUrl: newImageUrl, //更新为新的或现有的 Cloudinary URL
       },
-      { new: true }
+      { new: true } // 返回更新后的文档
     );
-    // 响应成功
-    console.log(`[DEBUG - updatePost] Post ID ${id} updated successfully.`); // 调试
-    res.json({ message: "Post updated successfully" });
+
+    console.log(`[DEBUG - updatePost] 文章 ID ${id} 更新成功。`);
+    res.json({ message: "文章更新成功" });
   } catch (error) {
-    console.error("Error updating post:", error);
-    res
-      .status(500)
-      .json({ error: "Error updating post", details: error.message });
+    console.error("更新文章出错:", error);
+    res.status(500).json({ error: "更新文章失败", details: error.message });
   }
 };
+
 // 定义获取所有文章的处理函数
 const getAllPosts = async (req, res) => {
   try {
@@ -182,7 +205,6 @@ const deletePost = async (req, res) => {
           `Cloudinary: 删除图片 ${publicIdToDelete} 失败:`,
           deleteError.message
         );
-        // 记录错误，但不要阻止文章删除操作
       }
     }
 
