@@ -1,10 +1,7 @@
 //控制器文件，用于处理与文章相关的请求
 const Post = require("../models/Post");
 const User = require("../models/User");
-const fs = require("fs");
-const path = require("path");
-const uploadsDir = path.join(__dirname, "../uploads");
-
+const cloudinary = require("cloudinary").v2;
 //定义创建文章的处理函数
 const createPost = async (req, res) => {
   try {
@@ -13,10 +10,6 @@ const createPost = async (req, res) => {
 
     // 逻辑判断，如果标题、摘要或内容为空，返回错误
     if (!title || !summary || !content) {
-      // 如果有文件上传失败，删除已上传的文件
-      if (req.file) {
-        fs.unlinkSync(req.file.path);
-      }
       // 返回错误信息
       return res
         .status(400)
@@ -32,17 +25,14 @@ const createPost = async (req, res) => {
       title,
       summary,
       content,
-      imageUrl: req.file.filename,
+      imageUrl: result.secure_url,
       author: req.user.id,
     });
     // 响应成功
     res.status(201).json(postDoc);
   } catch (error) {
     console.error("Error creating post:", error);
-    // 如果有文件上传失败，删除已上传的文件
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+
     res
       .status(500)
       .json({ error: "Error creating post", details: error.message });
@@ -115,97 +105,60 @@ const updatePost = async (req, res) => {
 // 定义获取所有文章的处理函数
 const getAllPosts = async (req, res) => {
   try {
-    // 从数据库中获取所有文章，并按照创建时间降序排列，限制返回数量为20
     const posts = await Post.find()
       .populate("author", ["username"])
       .sort({ createdAt: -1 })
       .limit(20);
-    // 将图片URL拼接成完整的URL
-    const postsWithImageUrls = posts.map((post) => {
-      const postObject = post.toObject();
-      if (postObject.imageUrl) {
-        postObject.imageUrl = `https://post-backend-9ycs.onrender.com/uploads/${postObject.imageUrl}`;
-      }
-      return postObject;
-    });
-    // 响应文章列表URL
-    res.json(postsWithImageUrls);
+
+    // 图片 URL 已经是完整的 Cloudinary URL，无需再拼接
+    res.json(posts);
   } catch (error) {
-    console.error("Error fetching posts:", error);
-    res
-      .status(500)
-      .json({ error: "Error fetching posts", details: error.message });
+    console.error("获取文章列表出错:", error);
+    res.status(500).json({ error: "获取文章列表失败", details: error.message });
   }
 };
 
 // 定义获取单个文章的处理函数
 const getPostById = async (req, res) => {
   try {
-    // 从请求参数中获取文章ID
     const { id } = req.params;
-    console.log(`[DEBUG - getPostById] Request for post ID: ${id}`);
-    // 从数据库中获取文章，并按照创建时间降序排列
+    console.log(`[DEBUG - getPostById] 请求文章 ID: ${id}`);
+
     const post = await Post.findById(id).populate("author", ["username"]);
 
     console.log(
-      `[DEBUG - getPostById] Raw post from DB:`,
-      post ? post.toObject() : "Post not found"
+      `[DEBUG - getPostById] 从数据库获取的原始文章:`,
+      post ? post.toObject() : "文章未找到"
     );
-    // 如果文章不存在，返回错误
+
     if (!post) {
-      console.log(`[DEBUG - getPostById] Post not found for ID: ${id}`);
-      return res.status(404).json({ error: "Post not found" });
-    }
-    // 将图片URL拼接成完整的URL
-    const postObject = post.toObject();
-
-    console.log(
-      `[DEBUG - getPostById] Post object after toObject():`,
-      postObject
-    );
-    // 如果文章存在，将图片URL拼接成完整的URL
-    if (postObject.imageUrl) {
-      console.log(
-        `[DEBUG - getPostById] Original imageUrl before拼接:`,
-        postObject.imageUrl
-      );
-      postObject.imageUrl = `https://post-backend-9ycs.onrender.com/uploads/${postObject.imageUrl}`;
-      console.log(
-        `[DEBUG - getPostById] Final imageUrl for response:`,
-        postObject.imageUrl
-      );
-    } else {
-      console.log(
-        `[DEBUG - getPostById] imageUrl is missing or empty in postObject for ID: ${id}`
-      );
+      console.log(`[DEBUG - getPostById] 未找到文章，ID: ${id}`);
+      return res.status(404).json({ error: "文章未找到" });
     }
 
-    res.json(postObject);
+    res.json(post);
   } catch (error) {
-    console.error("[DEBUG - getPostById] Error fetching post by ID:", error);
-    res
-      .status(500)
-      .json({ error: "Error fetching post", details: error.message });
+    console.error("[DEBUG - getPostById] 根据 ID 获取文章出错:", error);
+    res.status(500).json({ error: "获取文章失败", details: error.message });
   }
 };
+
 // 定义删除文章的处理函数
 const deletePost = async (req, res) => {
   try {
-    // 从请求参数中获取文章ID
     const { id } = req.params;
-    // 从数据库中获取文章
     const postDoc = await Post.findById(id);
-    // 逻辑判断，如果文章不存在，返回错误
+
     if (!postDoc) {
       console.log(`[DEBUG - deletePost] 文章未找到，ID: ${id}`);
       return res.status(404).json({ error: "文章未找到" });
     }
-    // 逻辑判断，如果用户未认证或用户不是文章的作者，返回错误
+
     if (!req.user || !req.user.id) {
-      console.log(`[DEBUG - deletePost] 用户未认证.`);
+      console.log(`[DEBUG - deletePost] 用户未认证。`);
       return res.status(401).json({ error: "用户未认证，请登录" });
     }
-    // 逻辑判断，如果用户不是文章的作者，返回错误
+
     const isAuthor = String(postDoc.author) === String(req.user.id);
     if (!isAuthor) {
       console.log(
@@ -213,19 +166,29 @@ const deletePost = async (req, res) => {
       );
       return res.status(403).json({ error: "无权删除此文章" });
     }
-    // 删除文章图片文件
-    if (postDoc.imageUrl) {
-      const imagePath = path.join(uploadsDir, postDoc.imageUrl);
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-        console.log(`[DEBUG - deletePost] 已删除图片文件: ${imagePath}`);
-      } else {
-        console.log(`[DEBUG - deletePost] 图片文件未找到: ${imagePath}`);
+
+    // 删除 Cloudinary 上的图片 (如果 imageUrl 存在且是 Cloudinary 的 URL)
+    if (postDoc.imageUrl && postDoc.imageUrl.includes("res.cloudinary.com")) {
+      const urlParts = postDoc.imageUrl.split("/");
+      const filenameWithExtension = urlParts[urlParts.length - 1];
+      const publicIdWithoutFolder = filenameWithExtension.split(".")[0];
+      const publicIdToDelete = `blog-posts/${publicIdWithoutFolder}`; // 组合文件夹名和文件名
+
+      try {
+        await cloudinary.uploader.destroy(publicIdToDelete);
+        console.log(`Cloudinary: 成功删除图片，Public ID: ${publicIdToDelete}`);
+      } catch (deleteError) {
+        console.warn(
+          `Cloudinary: 删除图片 ${publicIdToDelete} 失败:`,
+          deleteError.message
+        );
+        // 记录错误，但不要阻止文章删除操作
       }
     }
+
     // 从数据库中删除文章
     await Post.findByIdAndDelete(id);
-    console.log(`[DEBUG - deletePost] 文章 ID: ${id} 删除成功.`);
+    console.log(`[DEBUG - deletePost] 文章 ID: ${id} 删除成功。`);
     res.json({ message: "文章删除成功" });
   } catch (error) {
     console.error("删除文章失败:", error);

@@ -9,8 +9,17 @@ require("dotenv").config();
 const connectDB = require("./config/db");
 const authRouter = require("./routes/authRouter"); // 认证相关路由
 const postRouter = require("./routes/postRouter"); // 文章相关路由
-
 const app = express();
+// ✅ 导入 Cloudinary SDK
+const cloudinary = require("cloudinary").v2;
+
+// ✅ 初始化 Cloudinary 配置
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure: true, // 推荐使用 HTTPS 连接 Cloudinary
+});
 
 //全局中间件配置
 app.use(
@@ -24,13 +33,6 @@ app.use(
 
 app.use(express.json()); // 解析 JSON 格式的请求体
 app.use(cookieParser()); // 解析 Cookie
-
-// 静态文件服务：将 'uploads' 目录设置为静态文件目录
-const uploadsDir = path.join(__dirname, "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-app.use("/uploads", express.static(uploadsDir));
 
 // 连接数据库
 connectDB();
