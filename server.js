@@ -23,7 +23,7 @@ cloudinary.config({
 app.use(
   cors({
     credentials: true,
-    origin: "https://post-frontend-f7gxl37xc-game-idiots-projects.vercel.app", // 确保这里是你的前端地址
+    origin: "https://post-frontend-nhkxc383q-game-idiots-projects.vercel.app", // 确保这里是你的前端地址
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
